@@ -743,7 +743,7 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
                 rewardsDuration,
                 IERC20(address(rewardsToken)).balanceOf(who),
                 IERC20(address(stakingToken)).balanceOf(who),
-                flatFeeToken == address(0) ? 0 : IERC20(address(flatFeeToken)).balanceOf(who));
+                IERC20(address(flatFeeToken)).balanceOf(who));
     }
 
     // view all-time stats for this Forest
