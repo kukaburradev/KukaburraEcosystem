@@ -586,7 +586,7 @@ interface IKuka {
 }
 
 // https://docs.synthetix.io/contracts/source/contracts/stakingrewards
-contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, ReentrancyGuard, Pausable {
+contract Forest is IStakingRewards, RewardsDistributionRecipient, ReentrancyGuard, Pausable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -620,6 +620,9 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
 
     // tracker for total rewards earned for an account
     mapping(address => uint256) public totalRewardsEarned;
+
+    // mapping to indicate if a token address has a maximum transfer value (RFI etc)
+    mapping(address => bool) public tokenHasMaxTransfer;
 
     // percentage for deposit fee, if enabled
     uint public depositFeePercent;
@@ -660,7 +663,9 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
         uint _flatFee,
         uint _depositFeePercent,
         uint _feeModel,
-        uint _maximumTotalStaked
+        uint _maximumTotalStaked,
+        bool _rewardsMaxTransfer,
+        bool _stakingMaxTransfer
     ) public Owned(_owner) {
         rewardsToken = IERC20(_rewardsToken);
         stakingToken = IERC20(_stakingToken);
@@ -682,6 +687,10 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
         feeModel = _feeModel;
 
         maximumTotalStaked = _maximumTotalStaked;
+
+        // store the mapping values indiating if these tokens have a max transfer value
+        tokenHasMaxTransfer[address(_stakingToken)] = _stakingMaxTransfer;
+        tokenHasMaxTransfer[address(_rewardsToken)] = _rewardsMaxTransfer;
     }
 
     /* ========== VIEWS ========== */
@@ -897,12 +906,12 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
     internal returns (uint) {
         // check to see if the token being transferred has a maximum transfer value - only for RFI 'standard' compliant tokens (so most)
         address activeToken = staking ? address(stakingToken) : address(rewardsToken);
-        (bool success,) = activeToken.call(abi.encodeWithSignature("_maxTxAmount()"));
+        bool hasMaxTransfer = tokenHasMaxTransfer[staking ? address(stakingToken) : address(rewardsToken)];
 
         uint transferAmount = tokens;
         
         // this token has a maximum transfer value
-        if(success) {
+        if(hasMaxTransfer) {
             // load the maximum transfer value, which can be changed at any point in time
             uint maxTransfer = IKuka(address(activeToken))._maxTxAmount();
 
@@ -1011,6 +1020,14 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
         depositFeePercent = _depositFeePercent;
         flatFee = _flatFee;
         feeModel = _feeModel;
+    }
+
+    // allow the owner to update the max transfer value mappings in case of misconfiguration in constructor
+    function updateMaxTransfers(bool _rewardsMaxTransfer, bool _stakingMaxTransfer)
+    external onlyOwner {
+        // store the mapping values indiating if these tokens have a max transfer value
+        tokenHasMaxTransfer[address(stakingToken)] = _stakingMaxTransfer;
+        tokenHasMaxTransfer[address(rewardsToken)] = _rewardsMaxTransfer;
     }
 
     /* ========== MODIFIERS ========== */
